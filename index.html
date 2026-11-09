@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Учёт рабочего времени</title>
+    <style>
+        :root { 
+            --bg: #121212; --surf: #1e1e1e; --primary: #00adb5; --text: #eee; --muted: #999; --border: #333; --danger: #ff4d4d; --success: #2ecc71; --warn: #f1c40f; --warn-bg: rgba(241,196,15,0.1); 
+            --tag-base: #3498db; --tag-base-bg: rgba(52, 152, 219, 0.15);
+            --tag-fix: #e67e22; --tag-fix-bg: rgba(230, 126, 34, 0.15);
+            --tag-price: #9b59b6; --tag-price-bg: rgba(155, 89, 182, 0.15);
+            --tag-other: #7f8c8d; --tag-other-bg: rgba(127, 140, 141, 0.15);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .sync-banner { background: #2c3e50; width: 100%; max-width: 1400px; padding: 12px 20px; border-radius: 8px; border: 1px solid #34495e; display: flex; gap: 15px; align-items: center; transition: all 0.3s ease; }
+        .sync-banner label { font-size: 0.85rem; font-weight: bold; color: var(--primary); white-space: nowrap; }
+        .sync-banner input { flex: 1; background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 8px 12px; border-radius: 6px; outline: none; font-size: 0.9rem; }
+        .sync-status { font-size: 0.85rem; font-weight: bold; white-space: nowrap; padding: 4px 10px; border-radius: 4px; }
+        .status-offline { background: rgba(231, 76, 60, 0.2); color: #e74c3c; border: 1px solid #e74c3c; }
+        .status-online { background: rgba(46, 204, 113, 0.2); color: #2ecc71; border: 1px solid #2ecc71; }
+        .workspace { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 20px; width: 100%; max-width: 1400px; }
+        .column { background: var(--surf); padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 15px; }
+        h1, h2 { font-weight: 600; text-align: center; font-size: 1.2rem; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        .salary-box { background: var(--bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
+        .input-row { display: flex; flex-direction: column; gap: 6px; }
+        .input-row label { font-weight: bold; color: var(--primary); font-size: 0.85rem; }
+        .input-row input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: 6px; outline: none; text-align: center; font-size: 1.1rem; }
+        .info-line { font-size: 0.9rem; padding: 4px 0; display: flex; justify-content: space-between; border-bottom: 1px dashed #2a2a2a; }
+        .calc-text { font-size: 0.85rem; color: var(--muted); line-height: 1.4; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-box { background: var(--bg); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
+        .stat-box .label { font-size: 0.8rem; color: var(--muted); }
+        .stat-box .value { font-size: 1.2rem; font-weight: bold; }
+        .overtime-box { background: var(--warn-bg); border: 1px solid var(--warn); color: var(--warn); padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 0.9rem; display: none; line-height: 1.5; }
+        .progress-container { background: var(--bg); border-radius: 10px; height: 10px; overflow: hidden; border: 1px solid var(--border); }
+        .progress-bar { background: var(--primary); height: 100%; width: 0%; }
+        .timer-section { text-align: center; background: var(--bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border); }
+        .timer-display { font-size: 2.4rem; font-weight: bold; color: var(--primary); margin-bottom: 10px; }
+        .btn-group { display: flex; gap: 10px; }
+        button { padding: 10px; font-size: 0.9rem; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; color: #fff; }
+        .btn-start { background: var(--success); width: 100%; }
+        .btn-stop { background: var(--danger); width: 100%; }
+        .btn-primary { background: var(--primary); width: 100%; }
+        .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); font-size: 0.8rem; padding: 8px; text-align: center; border-radius: 6px; width: 100%; display: block; text-decoration: none; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        input, select, textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px; border-radius: 6px; outline: none; }
+        .history-list { max-height: 330px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+        .history-item { background: var(--bg); padding: 10px; border-radius: 6px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; gap: 10px; border-left: 5px solid transparent; cursor: pointer; }
+        .history-item:hover { filter: brightness(1.15); }
+        .history-item.item-base { border-left-color: var(--tag-base); background: var(--tag-base-bg); }
+        .history-item.item-fix { border-left-color: var(--tag-fix); background: var(--tag-fix-bg); }
+        .history-item.item-price { border-left-color: var(--tag-price); background: var(--tag-price-bg); }
+        .history-item.item-other { border-left-color: var(--tag-other); background: var(--tag-other-bg); }
+        .tag-badge { display: inline-block; font-size: 0.75rem; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-top: 4px; text-transform: uppercase; }
+        .tag-badge.badge-base { background: var(--tag-base); color: #fff; }
+        .tag-badge.badge-color-fix { background: var(--tag-fix); color: #fff; }
+        .tag-badge.badge-price { background: var(--tag-price); color: #fff; }
+        .tag-badge.badge-other { background: var(--tag-other); color: #fff; }
+        .history-item .note-text { color: var(--text); font-size: 0.85rem; margin-top: 4px; font-weight: 500; word-break: break-all; }
+        .history-item .duration { color: var(--primary); font-weight: bold; white-space: nowrap; }
+        .btn-delete { background: transparent; color: var(--danger); border: none; cursor: pointer; font-size: 1.1rem; padding: 5px; }
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        input[type="date"]::-webkit-calendar-picker-indicator,
+        input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1) brightness(1.5); cursor: pointer; opacity: 0.8; }
+        input[type="date"], input[type="time"] { position: relative; padding-right: 32px; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-box { background: var(--surf); padding: 25px; border-radius: 12px; border: 1px solid var(--border); width: 100%; max-width: 450px; display: flex; flex-direction: column; gap: 15px; }
+        .modal-btns { display: flex; gap: 10px; margin-top: 5px; }
+        @media (max-width: 900px) { .workspace { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="sync-banner">
+    <label for="script-url">Ссылка WebApp (Google Apps Script):</label>
+    <input type="text" id="script-url" placeholder="Вставьте сюда ссылку /exec и обновите страницу">
+    <span class="sync-status status-offline" id="sync-indicator">Облако: Выкл</span>
+</div>
+<div class="workspace">
+    <div class="column">
+        <h2>Мониторинг профессии</h2>
+        <div class="salary-box">
+            <div class="info-line"><span>Профессия:</span><span style="font-weight:bold; color:var(--primary);">Оператор Баз Данных (hh.kz)</span></div>
+            <div class="input-row"><label>Рыночный оклад (hh.kz) за 168 ч (тг.):</label><input type="number" id="market-salary" value="350000" step="1000"></div>
+            <div class="info-line"><span>Стоимость часа по рынку:</span><span id="rate-display" style="font-weight:bold; color:var(--success);">0 тг./ч</span></div>
+            <div class="input-row" style="border-top:1px solid var(--border); padding-top:10px;"><label>Текущий оклад за месяц (тг.):</label><input type="number" id="user-salary" value="150000" step="1000"></div>
+            <div class="calc-text" id="calc-explanation"></div>
+        </div>
+    </div>
+    <div class="column">
+        <h1>Учёт времени <span style="font-size:0.75rem; color:var(--muted); font-weight:normal;">(округление 15 мин)</span></h1>
+        <div class="stats-grid">
+            <div class="stat-box"><div class="label">Отработано (мес)</div><div class="value" id="stats-total">00:00</div></div>
+            <div class="stat-box" id="left-box"><div class="label">Осталось до лимита</div><div class="value" id="stats-left">00:00</div></div>
+        </div>
+        <div class="overtime-box" id="overtime-block">
+            ⚠ Лимит превышен! Переработка: <span id="overtime-val">00:00</span><br>
+            <span style="color:#fff; font-size:0.8rem;">Упущенный заработок: </span><span id="overtime-money" style="color:var(--danger); font-size:1.1rem; font-weight:bold;">0 тг.</span>
+        </div>
+        <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+        <div class="timer-section">
+            <div class="timer-display" id="timer-display">00:00:00</div>
+            <div class="form-row" style="margin-bottom: 10px;">
+                <div class="form-group" style="text-align:left;"><label>Категория (тег):</label><select id="timer-tag"><option value="base">Поступление</option><option value="fix">Корректировка</option><option value="price">Переоценка</option><option value="other">Разное</option></select></div>
+                <div class="form-group" style="text-align:left;"><label>Заметка к сессии:</label><input type="text" id="timer-note" placeholder="Что делаете?"></div>
+            </div>
+            <div class="btn-group"><button class="btn-start" id="btn-start">▶ Старт</button><button class="btn-stop" id="btn-stop" disabled style="opacity:0.5;">■ Стоп</button></div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--border); padding-top:10px;">
+            <p style="font-size:0.85rem; font-weight:bold; color:var(--primary);">Ручной ввод сессии</p>
+            <div class="form-group"><label>Дата:</label><input type="date" id="manual-date"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Начало:</label><input type="time" id="manual-start"></div>
+                <div class="form-group"><label>Конец:</label><input type="time" id="manual-end"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Категория (тег):</label><select id="manual-tag"><option value="base">Поступление</option><option value="fix">Корректировка</option><option value="price">Переоценка</option><option value="other">Разное</option></select></div>
+                <div class="form-group"><label>Заметка:</label><input type="text" id="manual-note" placeholder="Описание работы"></div>
+            </div>
+            <button class="btn-primary" id="btn-add-manual">Добавить сессию</button>
+        </div>
+    </div>
+    <div class="column">
+        <h2>История и Отчёты</h2>
+        <div class="form-group"><label>Фильтр записей:</label><select id="history-filter"><option value="month">Текущий месяц</option><option value="today">За сегодня</option><option value="all">Все записи</option></select></div>
+        <div class="history-list" id="history-list"></div>
+        <div style="border-top:1px solid var(--border); padding-top:10px; display:flex; flex-direction:column; gap:8px;">
+            <p style="font-size:0.7rem; font-weight:bold; color:var(--text-muted);">ЭКСПОРТ ОТЧЁТОВ</p>
+            <div class="action-grid"><button class="btn-secondary" id="btn-export-csv" style="border-color:#2ecc71; color:#2ecc71;">Excel</button><button class="btn-secondary" id="btn-export-pdf" style="border-color:#e74c3c; color:#e74c3c;">Отчёт PDF</button></div>
+            <p style="font-size:0.7rem; font-weight:bold; color:var(--text-muted);">ЛОКАЛЬНЫЙ БЭКАП</p>
+            <div class="action-grid"><button class="btn-secondary" id="btn-export-json">Создать</button><button class="btn-secondary" id="btn-import-json">Восстановить</button></div>
+            <input type="file" id="file-input" style="display:none;">
+        </div>
+    </div>
+</div>
+<div class="modal-overlay" id="edit-modal">
+    <div class="modal-box">
+        <h2 style="border:none; padding:0; margin:0; text-align:left; font-size:1.1rem; color:var(--primary);">Редактирование сессии</h2>
+        <div class="form-group"><label>Дата смены:</label><input type="date" id="edit-date"></div>
+        <div class="form-row">
+            <div class="form-group"><label>Время начала:</label><input type="time" id="edit-start"></div>
+            <div class="form-group"><label>Время конца:</label><input type="time" id="edit-end"></div>
+        </div>
+        <div class="form-group"><label>Категория (тег):</label><select id="edit-tag"><option value="base">Поступление</option><option value="fix">Корректировка</option><option value="price">Переоценка</option><option value="other">Разное</option></select></div>
+        <div class="form-group"><label>Заметка к работе:</label><input type="text" id="edit-note"></div>
+        <div class="modal-btns"><button class="btn-primary" id="btn-save-edit" style="background:var(--success);">Сохранить изменения</button><button class="btn-secondary" id="btn-close-modal" style="width:auto; padding:10px 15px;">Отмена</button></div>
+    </div>
+</div>
+<script>
+    let history = []; let state = JSON.parse(localStorage.getItem('t_s')) || { running: false, start: null, tag: 'base' }; let interval = null; let editingSessionId = null;
+    const mSalIn = document.getElementById('market-salary'), uSalIn = document.getElementById('user-salary'), calcExpl = document.getElementById('calc-explanation'), rDisp = document.getElementById('rate-display');
+    const sTotal = document.getElementById('stats-total'), sLeft = document.getElementById('stats-left'), lBox = document.getElementById('left-box'), oBlock = document.getElementById('overtime-block'), oVal = document.getElementById('overtime-val'), oMoney = document.getElementById('overtime-money'), pBar = document.getElementById('progress-bar');
+    const tDisp = document.getElementById('timer-display'), bStart = document.getElementById('btn-start'), bStop = document.getElementById('btn-stop'), hList = document.getElementById('history-list'), hFilter = document.getElementById('history-filter'), mDate = document.getElementById('manual-date'), mStart = document.getElementById('manual-start'), mEnd = document.getElementById('manual-end');
+    const tNote = document.getElementById('timer-note'), mNote = document.getElementById('manual-note'), tTag = document.getElementById('timer-tag'), mTag = document.getElementById('manual-tag'), editModal = document.getElementById('edit-modal'), editDate = document.getElementById('edit-date'), editStart = document.getElementById('edit-start'), editEnd = document.getElementById('edit-end'), editTag = document.getElementById('edit-tag'), editNote = document.getElementById('edit-note'), btnSaveEdit = document.getElementById('btn-save-edit'), btnCloseModal = document.getElementById('btn-close-modal'), scriptUrlInput = document.getElementById('script-url'), syncIndicator = document.getElementById('sync-indicator');
+    let mSal = 350000, uSal = 150000; mDate.value = new Date().toISOString().split('T')[0];
+    function hideBanner(hide) {
+        if(hide) { scriptUrlInput.style.display="none"; scriptUrlInput.previousElementSibling.style.display="none"; scriptUrlInput.parentElement.style.background="transparent"; scriptUrlInput.parentElement.style.border="none"; scriptUrlInput.parentElement.style.padding="0"; scriptUrlInput.parentElement.style.justifyContent="flex-end"; }
+        else { scriptUrlInput.style.display="block"; scriptUrlInput.previousElementSibling.style.display="block"; scriptUrlInput.parentElement.style.background="#2c3e50"; scriptUrlInput.parentElement.style.border="1px solid #34495e"; scriptUrlInput.parentElement.style.padding="12px 20px"; scriptUrlInput.parentElement.style.justifyContent="flex-start"; }
+    }
+    async function pushToCloud() {
+        let url = scriptUrlInput.value.trim(); if (!url) { hideBanner(false); return; }
+        syncIndicator.textContent = "Синхронизация..."; syncIndicator.className = "sync-status status-offline";
+        try { await fetch(url, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ history: history, uSal: uSal, mSal: mSal }) }); syncIndicator.textContent = "Облако: Синхрон."; syncIndicator.className = "sync-status status-online"; hideBanner(true); }
+        catch (err) { hideBanner(false); syncIndicator.textContent = "Ошибка сети"; syncIndicator.className = "sync-status status-offline"; }
+    }
+    async function fetchFromCloud() {
+        let url = scriptUrlInput.value.trim(); if (!url) { hideBanner(false); return; }
+        syncIndicator.textContent = "Загрузка...";
+        try { let res = await fetch(url); let data = await res.json(); if (data) { history = data.history || []; uSal = data.uSal || uSal; mSal = data.mSal || mSal; uSalIn.value = uSal; mSalIn.value = mSal; syncIndicator.textContent = "Облако: Подкл."; syncIndicator.className = "sync-status status-online"; hideBanner(true); updateUI(true); } }
+        catch (err) { hideBanner(false); syncIndicator.textContent = "Ошибка облака"; syncIndicator.className = "sync-status status-offline"; }
+    }
+    scriptUrlInput.addEventListener('change', () => { localStorage.setItem('t_google_url', scriptUrlInput.value.trim()); fetchFromCloud(); });
+    function fmt(mins) { return `${String(Math.floor(mins/60)).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`; }
+    function roundTo15Mins(startISO, endISO) {
+        let start = new Date(startISO), end = new Date(endISO), actualMins = Math.floor((end - start) / 60000); if (actualMins <= 0) return 0;
+        let hours = Math.floor(actualMins / 60), mins = actualMins % 60, remainder = mins % 15, roundedMins = remainder < 8 ? mins - remainder : mins + (15 - remainder);
+        if (roundedMins === 60) { hours += 1; roundedMins = 0; } return (hours * 60) + roundedMins;
+    }
+    const tagNames = { base: 'Поступление', fix: 'Корректировка', price: 'Переоценка', other: 'Разное' };
+    function updateUI(skipCloudPush) {
+        let rate = mSal / 168, allowed = Math.floor((uSal / rate) * 60), currentMins = 0, now = new Date(); rDisp.textContent = `${Math.round(rate).toLocaleString()} тг./ч`;
+        calcExpl.innerHTML = "При рынке в <b>" + mSal.toLocaleString() + " тг.</b> за ваш оклад справедливо отрабатывать не более <b>" + fmt(allowed) + "</b> в месяц.<br>Свыше этого - неоплаченный труд.";
+        history.forEach(s => { let d = new Date(s.start); if(d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear()) currentMins += s.durationMins || 0; });
+        sTotal.textContent = fmt(currentMins); let diff = allowed - currentMins;
+        if (diff <= 0) { 
+            lBox.style.display = "none"; oBlock.style.display = "block"; 
+            let overMins = Math.abs(diff); oVal.textContent = fmt(overMins);
+            oMoney.textContent = Math.round(overMins * (rate / 60)).toLocaleString() + " тг.";
+            pBar.style.width = "100%"; pBar.style.background = "var(--warn)"; 
+        } else { 
+            lBox.style.display = "block"; oBlock.style.display = "none"; 
+            sLeft.textContent = fmt(diff); pBar.style.width = (allowed > 0 ? Math.min((currentMins / allowed) * 100, 100) : 0) + "%"; 
+            pBar.style.background = "var(--primary)"; 
+        }
+        hList.innerHTML = "";
+        let fil = history.filter(s => { 
+            let d = new Date(s.start); 
+            if(hFilter.value === "month") return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); 
+            if(hFilter.value === "today") return d.toDateString() === now.toDateString(); 
+            return true; 
+        }).sort((a,b) => new Date(b.start) - new Date(a.start));
+        if(!fil.length) hList.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:10px;">Записей нет</div>';
+        else fil.forEach(s => {
+            let st = new Date(s.start), en = new Date(s.end), item = document.createElement("div"), currentTag = s.tag || "base", badgeClass = (currentTag === "fix" ? "badge-color-fix" : "badge-" + currentTag), nt = (s.note ? '<div class="note-text">' + s.note + '</div>' : "");
+            item.className = "history-item item-" + currentTag; 
+            item.setAttribute("onclick", "openEditModal('" + s.id + "', event)");
+            item.innerHTML = '<div style="overflow:hidden;"><b>' + st.toLocaleDateString("ru-RU") + '</b> <span class="tag-badge ' + badgeClass + '">' + tagNames[currentTag] + '</span><br><span style="color:var(--muted);font-size:0.8rem">' + st.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) + ' - ' + en.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) + '</span>' + nt + '</div><div style="display:flex;align-items:center;gap:15px;"><span class="duration">' + fmt(s.durationMins || 0) + '</span><button class="btn-delete" onclick="del(\'' + s.id + '\', event)">❌</button></div>'; 
+            hList.appendChild(item);
+        });
+        if (!skipCloudPush) pushToCloud();
+    }
+    window.openEditModal = function(id, event) {
+        let session = history.find(s => s.id === id); if (!session) return; editingSessionId = id;
+        let startObj = new Date(session.start), endObj = new Date(session.end), offset = startObj.getTimezoneOffset() * 60000, localISO = new Date(startObj.getTime() - offset).toISOString().split("T");
+        editDate.value = localISO[0]; editStart.value = startObj.toTimeString().substr(0, 5); editEnd.value = endObj.toTimeString().substr(0, 5); editTag.value = session.tag || "base"; editNote.value = session.note || ""; editModal.style.display = "flex";
+    };
+    btnCloseModal.addEventListener("click", () => { editModal.style.display = "none"; editingSessionId = null; });
+    btnSaveEdit.addEventListener("click", () => {
+        if (!editingSessionId) return; let sessionIndex = history.findIndex(s => s.id === editingSessionId); if (sessionIndex === -1) return;
+        let dateVal = editDate.value, startVal = editStart.value, endVal = editEnd.value; if (!dateVal || !startVal || !endVal) return alert("Заполните время смены");
+        let newStart = new Date(dateVal + "T" + startVal), newEnd = new Date(dateVal + "T" + endVal); if (newEnd <= newStart) return alert("Время окончания должно быть позже начала");
+        let roundedMins = roundTo15Mins(newStart.toISOString(), newEnd.toISOString()); history[sessionIndex].start = newStart.toISOString(); history[sessionIndex].end = newEnd.toISOString(); history[sessionIndex].durationMins = roundedMins; history[sessionIndex].tag = editTag.value; history[sessionIndex].note = editNote.value.trim();
+        editModal.style.display = "none"; editingSessionId = null; updateUI();
+    });
+    window.del = function(id, event) { if(event) event.stopPropagation(); if(confirm("Удалить?")) { history = history.filter(s => s.id !== id); updateUI(); } };
+    function ticks() {
+        if (state.running) {
+            bStart.disabled = true; bStart.style.opacity = 0.5; bStop.disabled = false; bStop.style.opacity = 1; tTag.disabled = true; tTag.value = state.tag || "base";
+            interval = setInterval(() => { let diff = new Date() - new Date(state.start), h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000); tDisp.textContent = String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0"); }, 1000);
+        } else { bStart.disabled = false; bStart.style.opacity = 1; bStop.disabled = true; bStop.style.opacity = 0.5; tTag.disabled = false; tDisp.textContent = "00:00:00"; if(interval) clearInterval(interval); }
+    }
+    bStart.addEventListener("click", () => { state = { running: true, start: new Date().toISOString(), tag: tTag.value }; localStorage.setItem("t_s", JSON.stringify(state)); ticks(); });
+    bStop.addEventListener("click", () => { if(state.running) { let endISO = new Date().toISOString(), roundedMins = roundTo15Mins(state.start, endISO); history.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), start: state.start, end: endISO, durationMins: roundedMins, note: tNote.value.trim(), tag: state.tag || "base" }); state = { running: false, start: null, tag: "base" }; localStorage.setItem("t_s", JSON.stringify(state)); tNote.value = ""; ticks(); updateUI(); } });
+    document.getElementById("btn-add-manual").addEventListener("click", () => {
+        if(!mDate.value || !mStart.value || !mEnd.value) return alert("Заполните поля");
+        let start = new Date(mDate.value + "T" + mStart.value), end = new Date(mDate.value + "T" + mEnd.value); if(end <= start) return alert("Ошибка времени");
+        let roundedMins = roundTo15Mins(start.toISOString(), end.toISOString()); history.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), start: start.toISOString(), end: end.toISOString(), durationMins: roundedMins, note: mNote.value.trim(), tag: mTag.value }); updateUI(); mStart.value = ""; mEnd.value = ""; mNote.value = "";
+    });
+    mSalIn.addEventListener("input", () => { let val = parseFloat(mSalIn.value); if(!isNaN(val)&&val>0) { mSal = val; updateUI(); } });
+    uSalIn.addEventListener("input", () => { let val = parseFloat(uSalIn.value); if(!isNaN(val)&&val>=0) { uSal = val; updateUI(); } });
+    hFilter.addEventListener("change", () => updateUI(true));
+    document.getElementById("btn-export-csv").addEventListener("click", () => {
+        let csv = "\uFEFFДата,Категория,Начало,Конец,Отработано,Заметка\n"; history.forEach(s => { let st = new Date(s.start), en = new Date(s.end); csv += st.toLocaleDateString("ru-RU") + "," + tagNames[s.tag || "base"] + "," + st.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) + "," + en.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) + "," + fmt(s.durationMins || 0) + ',"' + (s.note || "").replace(/"/g, '""') + '"\n'; });
+        let link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" })); link.setAttribute("download", "report.csv"); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    });
+    document.getElementById("btn-export-pdf").addEventListener("click", () => {
+        if (!history.length) return alert("История пуста");
+        const pWin = window.open("", "_blank"); let rows = "", tot = 0, rate = mSal / 168, allowed = Math.floor((uSal / rate) * 60);
+        let currentMonthMinutes = 0; const now = new Date(); history.forEach(s => { let d = new Date(s.start); if(d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear()) currentMonthMinutes += s.durationMins || 0; });
+        let overMinutesReport = currentMonthMinutes - allowed; let lostMoneyReport = (overMinutesReport > 0 ? Math.round(overMinutesReport * (rate / 60)) : 0);
+        [...history].sort((a,b)=>new Date(b.start)-new Date(a.start)).forEach(s => { let st = new Date(s.start), en = new Date(s.end); tot += s.durationMins || 0; rows += "<tr><td>" + st.toLocaleDateString("ru-RU") + "</td><td>" + tagNames[s.tag || "base"] + "</td><td>" + st.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) + "</td><td>" + en.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}) + "</td><td>" + (s.note || "-") + "</td><td><b>" + fmt(s.durationMins || 0) + "</b></td></tr>"; });
+        let htmlHead = "<html><head><title>Отчёт</title><style>body{font-family:sans-serif;padding:20px;color:#eee;background:#121212;display:flex;justify-content:center;}.box{width:100%;max-width:1000px;background:#1e1e1e;padding:30px;border-radius:12px;}h2{text-align:center;color:#00adb5;}.meta{text-align:center;margin-bottom:20px;color:#999;font-size:0.95rem;line-height:1.6;border-bottom:1px solid #333;padding-bottom:15px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #333;padding:12px;text-align:left;}th{background:rgba(0,173,181,0.1);color:#00adb5;}.total-row{background:rgba(0,173,181,0.05);font-weight:bold;border-top:2px solid #00adb5;}.total-row td{color:#00adb5;font-size:1.05rem;}@media print{body{background:#fff;color:#000;}.box{box-shadow:none;background:#fff;padding:0;}th,td{border:1px solid #000;color:#000;}th{background:#f2f2f2;color:#000;}h2{color:#000;}.total-row td{color:#000;border-top:1px solid #000;}.np{display:none;}}</style></head><body><div class=\"box\"><div class=\"np\" style=\"display:flex;justify-content:space-between;margin-bottom:20px;\"><span style=\"color:#999;font-size:0.9rem;\"> </span><button style=\"padding:10px 20px;font-weight:bold;border:none;border-radius:6px;cursor:pointer;color:#fff;background:#00adb5;\" onclick=\"window.print()\">🖨 Сохранить в PDF / Печать</button></div><h2>ОТЧЁТ ПО ОТРАБОТАННОМУ ВРЕМЕНИ</h2><div class=\"meta\">";
+        let htmlMeta = "Рыночный ориентир: " + mSal.toLocaleString() + " тг. (" + Math.round(rate) + " тг./ч)<br>Текущий оклад: " + uSal.toLocaleString() + " тг. | Выделенный лимит: " + fmt(allowed) + " ч<br><span style=\"color:var(--warn);\">Переработка за месяц: " + (overMinutesReport > 0 ? fmt(overMinutesReport) : "00:00") + " | Долг за переработку: " + lostMoneyReport.toLocaleString() + " тг.</span></div>";
+        let htmlTable = "<table><thead><tr><th>Дата</th><th>Категория</th><th>Начало</th><th>Конец</th><th>Описание работы</th><th>Всего</th></tr></thead><tbody>" + rows + "<tr class=\"total-row\"><td colspan=\"5\" style=\"text-align:right;\">ИТОГО ЗА ПЕРИОД:</td><td>" + fmt(tot) + "</td></tr></tbody></table></div></body></html>";
+        pWin.document.write(htmlHead + htmlMeta + htmlTable);
+        pWin.document.close();
+    });
+    document.getElementById("btn-export-json").addEventListener("click", () => {
+        let link = document.createElement("a");
+        link.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ uSal, mSal, history }));
+        link.setAttribute("download", "backup.json");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+    const fIn = document.getElementById("file-input");
+    document.getElementById("btn-import-json").addEventListener("click", () => fIn.click());
+    fIn.addEventListener("change", e => {
+        let file = e.target.files; if (!file || !file[0]) return;
+        let reader = new FileReader();
+        reader.onload = ev => {
+            try {
+                let p = JSON.parse(ev.target.result);
+                if (p.history) {
+                    history = p.history; uSal = p.uSal || uSal; mSal = p.mSal || mSal;
+                    uSalIn.value = uSal; mSalIn.value = mSal; updateUI();
+                    alert("Успешно!");
+                }
+            } catch(err) { alert("Ошибка файла"); }
+        };
+        reader.readAsText(file[0]); fIn.value = "";
+    });
+    let savedUrl = localStorage.getItem("t_google_url") || "";
+    scriptUrlInput.value = savedUrl;
+    if (savedUrl) { fetchFromCloud(); } 
+    else { history = JSON.parse(localStorage.getItem('t_h')) || []; updateUI(true); }
+    ticks();
+</script>
+</body>
+</html>
