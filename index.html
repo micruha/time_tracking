@@ -150,6 +150,39 @@
     </div>
 </div>
 <script>
+    (async function() {
+        const PASSWORD_HASH = "d9773bc180a39dd0334a4c1dfd01d59e1603e74b9b88ccd79149ffec702a396d";
+        
+        if (sessionStorage.getItem("admin_passed") !== "true") {
+            let passInput = prompt("Вход заблокирован. Введите секретный пароль администратора:");
+            if (!passInput) return fail();
+            const msgBuffer = new TextEncoder().encode(passInput);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const userHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            if (userHash === PASSWORD_HASH) {
+                sessionStorage.setItem("admin_passed", "true");
+                if (typeof loadSalariesData === "function") loadSalariesData();
+            } else {
+                fail();
+            }
+        }
+        function fail() {
+            alert("Доступ категорически запрещен!");
+            document.documentElement.innerHTML = "<html style='background:#141414;'><body style='font-family:sans-serif; color:#f44336; text-align:center; padding-top:100px;'><h1>🚫 Доступ ограничен</h1></body></html>";
+            throw new Error("Блокировка доступа.");
+        }
+    })();
+
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+        if (e.key === 'F12' || 
+            (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'c' || e.key === 'C')) || 
+            (e.ctrlKey && (e.key === 'u' || e.key === 'U'))) {
+            e.preventDefault();
+            return false;
+        }
+    });
     let history = []; let state = JSON.parse(localStorage.getItem('t_s')) || { running: false, start: null, tag: 'base' }; let interval = null; let editingSessionId = null;
     const mSalIn = document.getElementById('market-salary'), uSalIn = document.getElementById('user-salary'), calcExpl = document.getElementById('calc-explanation'), rDisp = document.getElementById('rate-display');
     const sTotal = document.getElementById('stats-total'), sLeft = document.getElementById('stats-left'), lBox = document.getElementById('left-box'), oBlock = document.getElementById('overtime-block'), oVal = document.getElementById('overtime-val'), oMoney = document.getElementById('overtime-money'), pBar = document.getElementById('progress-bar');
