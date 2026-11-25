@@ -153,7 +153,7 @@
     (async function() {
         const PASSWORD_HASH = "d9773bc180a39dd0334a4c1dfd01d59e1603e74b9b88ccd79149ffec702a396d";
         if (sessionStorage.getItem("admin_passed") !== "true") {
-            let passInput = prompt("Вход заблокирован. Введите секретный пароль администратора:");
+            let passInput = prompt("Доступ заблокирован. Введите пароль:");
             if (!passInput) return fail();
             const msgBuffer = new TextEncoder().encode(passInput);
             const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
