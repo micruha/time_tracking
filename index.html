@@ -91,7 +91,7 @@
         </div>
     </div>
     <div class="column">
-        <h1>Учёт времени <span style="font-size:0.75rem; color:var(--muted); font-weight:normal;">(округление 15 мин)</span></h1>
+        <h1>Учёт времени <span style="font-size:0.75rem; color:var(--muted); font-weight:normal;">(шаг 15 мин)</span></h1>
         <div class="stats-grid">
             <div class="stat-box"><div class="label">Отработано (мес)</div><div class="value" id="stats-total">00:00</div></div>
             <div class="stat-box" id="left-box"><div class="label">Осталось до лимита</div><div class="value" id="stats-left">00:00</div></div>
@@ -104,7 +104,7 @@
         <div class="timer-section">
             <div class="timer-display" id="timer-display">00:00:00</div>
             <div class="form-row" style="margin-bottom: 10px;">
-                <div class="form-group" style="text-align:left;"><label>Категория (тег):</label><select id="timer-tag"><option value="base">Поступление</option><option value="fix">Корректировка</option><option value="price">Переоценка</option><option value="other">Разное</option></select></div>
+                <div class="form-group" style="text-align:left;"><label>Категория:</label><select id="timer-tag"><option value="base">Поступление</option><option value="fix">Корректировка</option><option value="price">Переоценка</option><option value="other">Разное</option></select></div>
                 <div class="form-group" style="text-align:left;"><label>Заметка к сессии:</label><input type="text" id="timer-note" placeholder="Что делаете?"></div>
             </div>
             <div class="btn-group"><button class="btn-start" id="btn-start">▶ Старт</button><button class="btn-stop" id="btn-stop" disabled style="opacity:0.5;">■ Стоп</button></div>
@@ -117,7 +117,7 @@
                 <div class="form-group"><label>Конец:</label><input type="time" id="manual-end"></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label>Категория (тег):</label><select id="manual-tag"><option value="base">Поступление</option><option value="fix">Корректировка</option><option value="price">Переоценка</option><option value="other">Разное</option></select></div>
+                <div class="form-group"><label>Категория:</label><select id="manual-tag"><option value="base">Поступление</option><option value="fix">Корректировка</option><option value="price">Переоценка</option><option value="other">Разное</option></select></div>
                 <div class="form-group"><label>Заметка:</label><input type="text" id="manual-note" placeholder="Описание работы"></div>
             </div>
             <button class="btn-primary" id="btn-add-manual">Добавить сессию</button>
@@ -144,7 +144,7 @@
             <div class="form-group"><label>Время начала:</label><input type="time" id="edit-start"></div>
             <div class="form-group"><label>Время конца:</label><input type="time" id="edit-end"></div>
         </div>
-        <div class="form-group"><label>Категория (тег):</label><select id="edit-tag"><option value="base">Поступление</option><option value="fix">Корректировка</option><option value="price">Переоценка</option><option value="other">Разное</option></select></div>
+        <div class="form-group"><label>Категория:</label><select id="edit-tag"><option value="base">Поступление</option><option value="fix">Корректировка</option><option value="price">Переоценка</option><option value="other">Разное</option></select></div>
         <div class="form-group"><label>Заметка к работе:</label><input type="text" id="edit-note"></div>
         <div class="modal-btns"><button class="btn-primary" id="btn-save-edit" style="background:var(--success);">Сохранить изменения</button><button class="btn-secondary" id="btn-close-modal" style="width:auto; padding:10px 15px;">Отмена</button></div>
     </div>
@@ -152,7 +152,6 @@
 <script>
     (async function() {
         const PASSWORD_HASH = "d9773bc180a39dd0334a4c1dfd01d59e1603e74b9b88ccd79149ffec702a396d";
-        
         if (sessionStorage.getItem("admin_passed") !== "true") {
             let passInput = prompt("Вход заблокирован. Введите секретный пароль администратора:");
             if (!passInput) return fail();
@@ -173,7 +172,6 @@
             throw new Error("Блокировка доступа.");
         }
     })();
-
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('keydown', e => {
         if (e.key === 'F12' || 
@@ -207,10 +205,11 @@
     }
     scriptUrlInput.addEventListener('change', () => { localStorage.setItem('t_google_url', scriptUrlInput.value.trim()); fetchFromCloud(); });
     function fmt(mins) { return `${String(Math.floor(mins/60)).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`; }
-    function roundTo15Mins(startISO, endISO) {
-        let start = new Date(startISO), end = new Date(endISO), actualMins = Math.floor((end - start) / 60000); if (actualMins <= 0) return 0;
-        let hours = Math.floor(actualMins / 60), mins = actualMins % 60, remainder = mins % 15, roundedMins = remainder < 8 ? mins - remainder : mins + (15 - remainder);
-        if (roundedMins === 60) { hours += 1; roundedMins = 0; } return (hours * 60) + roundedMins;
+    function ceilTo15Mins(startISO, endISO) {
+        let start = new Date(startISO), end = new Date(endISO);
+        let actualMins = Math.floor((end - start) / 60000);
+        if (actualMins <= 0) return 0;
+        return Math.ceil(actualMins / 15) * 15;
     }
     const tagNames = { base: 'Поступление', fix: 'Корректировка', price: 'Переоценка', other: 'Разное' };
     function updateUI(skipCloudPush) {
@@ -255,22 +254,31 @@
         if (!editingSessionId) return; let sessionIndex = history.findIndex(s => s.id === editingSessionId); if (sessionIndex === -1) return;
         let dateVal = editDate.value, startVal = editStart.value, endVal = editEnd.value; if (!dateVal || !startVal || !endVal) return alert("Заполните время смены");
         let newStart = new Date(dateVal + "T" + startVal), newEnd = new Date(dateVal + "T" + endVal); if (newEnd <= newStart) return alert("Время окончания должно быть позже начала");
-        let roundedMins = roundTo15Mins(newStart.toISOString(), newEnd.toISOString()); history[sessionIndex].start = newStart.toISOString(); history[sessionIndex].end = newEnd.toISOString(); history[sessionIndex].durationMins = roundedMins; history[sessionIndex].tag = editTag.value; history[sessionIndex].note = editNote.value.trim();
+        let roundedMins = ceilTo15Mins(newStart.toISOString(), newEnd.toISOString()); history[sessionIndex].start = newStart.toISOString(); history[sessionIndex].end = newEnd.toISOString(); history[sessionIndex].durationMins = roundedMins; history[sessionIndex].tag = editTag.value; history[sessionIndex].note = editNote.value.trim();
         editModal.style.display = "none"; editingSessionId = null; updateUI();
     });
     window.del = function(id, event) { if(event) event.stopPropagation(); if(confirm("Удалить?")) { history = history.filter(s => s.id !== id); updateUI(); } };
     function ticks() {
         if (state.running) {
             bStart.disabled = true; bStart.style.opacity = 0.5; bStop.disabled = false; bStop.style.opacity = 1; tTag.disabled = true; tTag.value = state.tag || "base";
-            interval = setInterval(() => { let diff = new Date() - new Date(state.start), h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000); tDisp.textContent = String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0"); }, 1000);
+            interval = setInterval(() => {
+                let diff = new Date() - new Date(state.start);
+                let h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
+                tDisp.textContent = String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+                let newCharged = Math.ceil(diff / (15 * 60000)) * 15;
+                if (state.chargedMins !== newCharged) {
+                    state.chargedMins = newCharged;
+                    localStorage.setItem("t_s", JSON.stringify(state));
+                }
+            }, 1000);
         } else { bStart.disabled = false; bStart.style.opacity = 1; bStop.disabled = true; bStop.style.opacity = 0.5; tTag.disabled = false; tDisp.textContent = "00:00:00"; if(interval) clearInterval(interval); }
     }
-    bStart.addEventListener("click", () => { state = { running: true, start: new Date().toISOString(), tag: tTag.value }; localStorage.setItem("t_s", JSON.stringify(state)); ticks(); });
-    bStop.addEventListener("click", () => { if(state.running) { let endISO = new Date().toISOString(), roundedMins = roundTo15Mins(state.start, endISO); history.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), start: state.start, end: endISO, durationMins: roundedMins, note: tNote.value.trim(), tag: state.tag || "base" }); state = { running: false, start: null, tag: "base" }; localStorage.setItem("t_s", JSON.stringify(state)); tNote.value = ""; ticks(); updateUI(); } });
+    bStart.addEventListener("click", () => { state = { running: true, start: new Date().toISOString(), tag: tTag.value, chargedMins: 15 }; localStorage.setItem("t_s", JSON.stringify(state)); ticks(); });
+    bStop.addEventListener("click", () => { if(state.running) { let endISO = new Date().toISOString(), roundedMins = ceilTo15Mins(state.start, endISO); history.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), start: state.start, end: endISO, durationMins: roundedMins, note: tNote.value.trim(), tag: state.tag || "base" }); state = { running: false, start: null, tag: "base", chargedMins: 0 }; localStorage.setItem("t_s", JSON.stringify(state)); tNote.value = ""; ticks(); updateUI(); } });
     document.getElementById("btn-add-manual").addEventListener("click", () => {
         if(!mDate.value || !mStart.value || !mEnd.value) return alert("Заполните поля");
         let start = new Date(mDate.value + "T" + mStart.value), end = new Date(mDate.value + "T" + mEnd.value); if(end <= start) return alert("Ошибка времени");
-        let roundedMins = roundTo15Mins(start.toISOString(), end.toISOString()); history.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), start: start.toISOString(), end: end.toISOString(), durationMins: roundedMins, note: mNote.value.trim(), tag: mTag.value }); updateUI(); mStart.value = ""; mEnd.value = ""; mNote.value = "";
+        let roundedMins = ceilTo15Mins(start.toISOString(), end.toISOString()); history.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), start: start.toISOString(), end: end.toISOString(), durationMins: roundedMins, note: mNote.value.trim(), tag: mTag.value }); updateUI(); mStart.value = ""; mEnd.value = ""; mNote.value = "";
     });
     mSalIn.addEventListener("input", () => { let val = parseFloat(mSalIn.value); if(!isNaN(val)&&val>0) { mSal = val; updateUI(); } });
     uSalIn.addEventListener("input", () => { let val = parseFloat(uSalIn.value); if(!isNaN(val)&&val>=0) { uSal = val; updateUI(); } });
@@ -321,6 +329,12 @@
     if (savedUrl) { fetchFromCloud(); } 
     else { history = JSON.parse(localStorage.getItem('t_h')) || []; updateUI(true); }
     ticks();
+    window.addEventListener("beforeunload", (e) => {
+        if (state && state.running) {
+            e.preventDefault();
+            e.returnValue = "";
+        }
+    });
 </script>
 </body>
 </html>
